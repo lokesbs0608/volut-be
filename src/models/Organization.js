@@ -15,7 +15,7 @@ const OrganizationSchema = new mongoose.Schema({
   logo: String, // URL or path to the logo image
   contactNumber: String, // Primary contact number
   website: String, // Website address
-  bannerImage: String, // URL or path to the banner image
+  bannerImage: [String], // Array of URLs or paths to banner images
   locationAlternateNumber: String, // Alternate contact number for the location
   alternateEmail: String, // Alternate email address
   coordinators: [CoordinatorSchema], // List of coordinators

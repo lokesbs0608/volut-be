@@ -5,11 +5,19 @@ const Chat = require('../models/Chat');
 // Create a new event
 exports.createEvent = async (req, res) => {
     try {
-        const { name, description, date, organizationId } = req.body;
+        const {
+            name,
+            description,
+            date,
+            organizationId,
+            location,
+            city,
+            coordinators // Make sure to include this field if you need it
+        } = req.body;
 
         // Validate input
-        if (!name || !description || !date || !organizationId) {
-            return res.status(400).json({ error: 'All fields are required.' });
+        if (!name || !description || !date || !organizationId || !location || !city) {
+            return res.status(400).json({ error: 'All required fields are not provided.' });
         }
 
         // Check if organization exists
@@ -19,7 +27,16 @@ exports.createEvent = async (req, res) => {
         }
 
         // Create and save the new event
-        const event = new Event({ name, description, date, organization: organizationId });
+        const event = new Event({
+            name,
+            description,
+            date,
+            organization: organizationId,
+            location, // Add the location
+            city, // Add the city
+            coordinators // Add the coordinators if provided
+        });
+
         const savedEvent = await event.save();
 
         // Automatically create a chat for the event
@@ -123,6 +140,98 @@ exports.deleteEvent = async (req, res) => {
         await Chat.findByIdAndDelete(event.chat);
 
         res.status(200).json({ message: 'Event deleted successfully!' });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+};
+
+// Request to volunteer for an event
+exports.requestToVolunteer = async (req, res) => {
+    try {
+        const { eventId, userId } = req.body;
+
+        // Validate input
+        if (!eventId || !userId) {
+            return res.status(400).json({ error: 'Event ID and User ID are required.' });
+        }
+
+        // Find the event
+        const event = await Event.findById(eventId);
+        if (!event) {
+            return res.status(404).json({ error: 'Event not found.' });
+        }
+
+        // Check if the user is already in the requested volunteers list
+        if (event.req_volunteers.includes(userId)) {
+            return res.status(400).json({ error: 'User has already requested to volunteer for this event.' });
+        }
+
+        // Add the user to the req_volunteers array
+        event.req_volunteers.push(userId);
+        await event.save();
+
+        res.status(200).json({ message: 'Request to volunteer sent successfully.', event });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+};
+
+// Accept a volunteer request
+exports.acceptVolunteer = async (req, res) => {
+    try {
+        const { eventId, userId } = req.body;
+
+        // Validate input
+        if (!eventId || !userId) {
+            return res.status(400).json({ error: 'Event ID and User ID are required.' });
+        }
+
+        // Find the event
+        const event = await Event.findById(eventId);
+        if (!event) {
+            return res.status(404).json({ error: 'Event not found.' });
+        }
+
+        // Check if the user is in the requested volunteers list
+        if (!event.req_volunteers.includes(userId)) {
+            return res.status(400).json({ error: 'User has not requested to volunteer for this event.' });
+        }
+
+        // Remove the user from req_volunteers and add to accepted_volunteers
+        event.req_volunteers.pull(userId);
+        event.accepted_volunteers.push(userId);
+        await event.save();
+
+        res.status(200).json({ message: 'Volunteer request accepted successfully.', event });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+};
+
+// Get all events associated with an organization
+exports.getEventsByOrganizationId = async (req, res) => {
+    try {
+        const { organizationId } = req.params;
+
+        // Validate input
+        if (!organizationId) {
+            return res.status(400).json({ error: 'Organization ID is required.' });
+        }
+
+        // Check if the organization exists
+        const organization = await Organization.findById(organizationId);
+        if (!organization) {
+            return res.status(404).json({ error: 'Organization not found.' });
+        }
+
+        // Retrieve events associated with the organization, excluding specific fields
+        const events = await Event.find({ organization: organizationId })
+            .select('-reg_volunteers -accepted_volunteers -chat'); // Exclude specific fields
+
+        res.status(200).json(events);
     } catch (err) {
         console.error(err.message);
         res.status(500).json({ error: 'Internal Server Error' });

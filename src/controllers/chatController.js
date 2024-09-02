@@ -1,6 +1,7 @@
 const Chat = require('../models/Chat');
 const path = require('path');
 const multer = require('multer');
+const Event = require('../models/Event');
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -30,6 +31,17 @@ exports.createMessage = async (req, res) => {
       return res.status(404).json({ error: 'Chat not found.' });
     }
 
+    // Find the event associated with this chat
+    const event = await Event.findById(chat.event);
+    if (!event) {
+      return res.status(404).json({ error: 'Event not found.' });
+    }
+
+    // Check if the user is in the accepted_volunteers list
+    if (!event.accepted_volunteers.includes(user)) {
+      return res.status(403).json({ error: 'You are not authorized to chat in this event.' });
+    }
+
     const newMessage = {
       user: user || undefined,
       organization: organization || undefined,
@@ -50,7 +62,6 @@ exports.createMessage = async (req, res) => {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
-
 // Retrieve all messages for a specific event (chat)
 exports.getChatByEventId = async (req, res) => {
   try {
